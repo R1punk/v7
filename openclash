@@ -1,66 +1,78 @@
 #!/bin/bash
-#data1=$(rmnet_data1)
-#data2=$(rmnet_data2)
 
-ip1=$(ip -4 addr show rmnet_data2 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | awk '{print $1}')
-ip2=$(ip -4 addr show rmnet_data1 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | awk '{print $1}')
-
-dialog --backtitle "                         Ripunk@E99" --title  \
-       "Open Clash" --inputbox \
-"Your IP: $ip1 $ip2\n_________________________________________\nMenu Tunnel :\n_________________________________________\n|1. Trojan Single Akun                  |\n|2. Trojan LB                           |\n|3. Vmess                               |\n_________________________________________\nMenu Config :\n_________________________________________\n|4. Backup Config                       |\n|5. Restore Config                      |\n_________________________________________\nStart Tunnels :\n_________________________________________\n|6. Start Clash                         |\n|7. Stop Clash                          |\n_________________________________________\n                               By :Ripunk " 25 45 2>pilih
-pil=$(<pilih)
-
-case $pil in
-1)
-dialog --inputbox "Profile :" 10 45 2>prof
-namet1=$(<prof)
+#ip1=$(ip -4 addr show rmnet_data2 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | awk '{print $1}')
+#ip2=$(ip -4 addr show rmnet_data1 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | awk '{print $1}')
+trap ctrl_c INT
+function ctrl_c() {
+	echo ""
+	sleep 0.5
+	exit 1
+}
+function satu() {
+            dialog --inputbox "Profile :" 10 45 2>prof
+            namet1=$(<prof)
             dialog --inputbox "SNI :" 10 45 2>snit1.txt
             snt1=$(<snit1.txt)
             dialog --inputbox "Import URL :" 10 45 2>trojan1.txt
             url1=$(<trojan1.txt)
+
 host1=$(grep trojan:// trojan1.txt|awk -F "://" '{print $2}'|awk -F "@" '{print $2}'|awk -F ":" '{print $1}'|awk "NR==1")
 #host=$(ping $host -w1 -c1|awk "NR==1"|awk -F '(' '{print $2}'|awk -F ')' '{print $1}')
 port1=$(grep trojan:// trojan1.txt|awk -F "://" '{print $2}'|awk -F "@" '{print $2}'|awk -F ":" '{print $2}'|awk -F "/" '{print $1}'|awk "NR==1")
 #sni=$(grep sni= sni1.txt|awk -F "=" '{print $2}')
 pass1=$(grep trojan:// trojan1.txt|awk -F "://" '{print $2}'|awk -F "@" '{print $1}'|awk "NR==1")
-echo """port: 7890
+echo """
+port: 7890
 socks-port: 7891
 redir-port: 7892
 mixed-port: 7893
-tproxy-port: 9898
-bind-address: '*'
 mode: rule
+log-level: info
 allow-lan: true
-log-level: silent
 external-controller: 0.0.0.0:9090
+bind-address: '*'
 external-ui: yacd-gh-pages
-unified-delay: true
 ipv6: false
 dns:
   enable: true
-  ipv6: true
-  listen: 0.0.0.0:1053
-  enhanced-mode: fake-ip
-  fake-ip-range: 28.0.0.0/8
-  use-hosts: true
+  ipv6: false
+  enhanced-mode: redir-host
+  listen: 0.0.0.0:7894
+  fallback-filter:
+    geoip: false
+    ipcidr:
+    - 240.0.0.0/4
   nameserver:
     - https://cloudflare-dns.com/dns-query
+    - https://dns.google/dns-query
+    - tls://1.1.1.1:853
+    - tls://8.8.8.8:853
   fallback:
-    - https://dns.google/dns-query  
+    - tcp://1.1.1.1
+    - tcp://8.8.8.8
+    - 1.1.1.1
+    - 8.8.8.8
+tun:
+  enable: true
+  stack: system 
+  macOS-auto-route: true
+  macOS-auto-detect-interface: true
+  dns-hijack:
+    - tcp://8.8.8.8:53
+experimental:
+  interface-name: en0
+
 proxies:
   - {name: $namet1, server: $host1, port: $port1, udp: true, type: trojan, password: $pass1, sni: $snt1, skip-cert-verify: true}
-#  - {name: Nh, server: wanrancomp.duckdns.org, port: 443, type: vmess, uuid: ace296d8-c78f-4a57-99d8-501cee4198b3, sni: v24.tiktokcdn.com, alterId: 0, cipher: auto, tls: true, skip-cert-verify: true, udp: true, network: ws, ws-path: /76ddd844e/, ws-headers: {Host: v24.tiktokcdn.com}}
+
 proxy-groups:
-  - name: AKUN
-    type: load-balance
-    url: 'http://www.gstatic.com/generate_204'
-    interval: 250
-    strategy: consistent-hashing
-    proxies: 
+  - name: trojan
+    type: select
+    proxies:
       - $namet1
-#      - Nh
+
 rules:
-  - MATCH,AKUN """ > $HOME/.config/clash/single.yaml
+ - MATCH,trojan""" >$HOME/.config/clash/a/config.yaml
 echo """
 Akun Trojan
 Profile : $namet1
@@ -70,22 +82,40 @@ Password: $pass1
 Sni     : $snt1
 """ >single.txt
 akun=$(cat single.txt)
+
 display_result () {
  dialog --title "Info Account" \
         --no-collapse \
         --msgbox "$akun" 0 0
 }
 
-result=$(cat akunt.txt)
+#result=$(cat akunt.txt)
 display_result
 rm single.txt 2>&1
 rm prof 2>&1
 rm snit1.txt 2>&1
 rm trojan1.txt 2>&1
 sleep 2
-mv $HOME/.config/clash/config.yaml $HOME/.config/clash/configbackup.yaml
-mv $HOME/.config/clash/single.yaml $HOME/.config/clash/config.yaml
-clash -t -d $HOME/.config/clash -f $HOME/.config/clash/config.yaml >HOME/.config/clash/run.logs
+#mv $HOME/.config/clash/config.yaml $HOME/.config/clash/configbackup.yaml
+cp $HOME/.config/clash/a/config.yaml $HOME/.config/clash/
+clash -t -d $HOME/.config/clash -f $HOME/.config/clash/config.yaml > $HOME/.config/clash/run.logs
+if [ $? != 0 ]; then
+for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
+display_result () {
+ dialog --title "Status Tunnels" \
+        --no-collapse \
+        --infobox "$status" 0 0
+}
+status=$(cat $HOME/.config/clash/run.logs)
+display_result
+sleep 2
+menu
+else
 screen -dmS v2 clash
 for i in $(seq 1 100)
 do
@@ -101,10 +131,12 @@ display_result () {
 status=$(cat $HOME/.config/clash/run.logs)
 display_result
 xdg-open "http://127.0.0.1:9090/ui/#/proxies" & exit
-;;
+fi
+}
 
-2)
- dialog --inputbox "Profile :" 10 45 2>namet2
+#Dua
+function dua() {
+            dialog --inputbox "Profile :" 10 45 2>namet2
             nmt2=$(<namet2)
             dialog --inputbox "SNI :" 10 45 2>snit2.txt
             snt2=$(<snit2.txt)
@@ -123,7 +155,7 @@ echo """proxies:
   password: $pass2
   udp: true
   sni: $snt2
-  skip-cert-verify: true """ > .config/clash/Game.yaml
+  skip-cert-verify: true """ > $HOME/.config/clash/Game.yaml
 sleep 2
 dialog --inputbox "Profile :" 10 45 2>namet3
             nmt3=$(<namet3)
@@ -144,7 +176,7 @@ echo """proxies:
   password: $pass3
   udp: true
   sni: $snt3
-  skip-cert-verify: true """ > .config/clash/Sosmed.yaml
+  skip-cert-verify: true """ > $HOME/.config/clash/Sosmed.yaml
 sleep 2
 dialog --inputbox "Profile :" 10 45 2>namet4
             nmt4=$(<namet4)
@@ -165,7 +197,7 @@ echo """proxies:
   password: $pass4
   udp: true
   sni: $snt4
-  skip-cert-verify: true """ > .config/clash/Youtube.yaml
+  skip-cert-verify: true """ > $HOME/.config/clash/Youtube.yaml
 sleep 2
 dialog --inputbox "Profile :" 10 45 2>namet5
             nmt5=$(<namet5)
@@ -184,7 +216,7 @@ echo """proxies:
   password: $pass5
   udp: true
   sni: $snt5
-  skip-cert-verify: true """ > .config/clash/Browser.yaml
+  skip-cert-verify: true """ > $HOME/.config/clash/Browser.yaml
 rm namet2 2>&1
 rm snit2.txt 2>&1
 rm trojan2.txt 2>&1
@@ -239,33 +271,52 @@ rm akunt.txt 2>&1
 clear
 #mv $HOME/.config/clash/config.yaml $HOME/.config/clash/configbackup.yaml
 cp $HOME/.config/clash/lb/config.yaml $HOME/.config/clash/config.yaml
-clash -t -d $HOME/.config/clash -f $HOME/.config/clash/config.yaml
+clash -t -d $HOME/.config/clash -f $HOME/.config/clash/config.yaml > $HOME/.config/clash/run.logs
+if [ $? != 0 ]; then
+for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
+display_result () {
+ dialog --title "Status Tunnels" \
+        --no-collapse \
+        --infobox "$status" 0 0
+}
+status=$(cat $HOME/.config/clash/run.logs)
+display_result
+sleep 2
+menu
+else
 screen -dmS v2 clash
 for i in $(seq 1 100)
 do
     sleep 0.1 
     echo $i
 done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
-status=$(cat $HOME/.config/clash/run/run.logs)
+status=$(cat $HOME/.config/clash/run.logs)
 display_result () {
  dialog --title "Status Tunnels" \
         --no-collapse \
         --msgbox "$status" 0 0
 }
-status=$(cat $HOME/.config/clash/run/run.logs)
+status=$(cat $HOME/.config/clash/run.logs)
 display_result
 xdg-open "http://127.0.0.1:9090/ui/#/proxies" & exit
-;;
+fi
+}
 
-3)
-dialog --inputbox "Profile :" 10 45 2>namev
+#Tiga
+function tiga() {
+    dialog --inputbox "Profile :" 10 45 2>namev
             nmv=$(<namev)
             dialog --inputbox "BUG : " 10 45 2>bug.txt
             bug=$(<bug.txt)
             dialog --inputbox "Iport URL" 10 45 2>vmess.txt
-            urlv=$(<vmess.txt)
+#            urlv=$(<vmess.txt)
             sleep 2
-mkdir -p v2ray;juuid=1;n2
+mkdir -p v2ray;juuid=1;n=2
 portv=$(grep vmess: vmess.txt 2>/dev/null|awk -F "//" '{print $2}'|base64 -d 2>/dev/null|sed ':a;N;$!ba;s/\n  //g'|awk -F '"port' '{print $2}'|grep :|sed ':a;N;$!ba;s/\n/ /g'|awk -F ',' '{print $1}'|sed -e 's/://g' -e 's/ //g' -e 's/"//g')
   if [ ! -f $portv ]; then
  while [ $juuid -lt 17 ]; do
@@ -287,23 +338,57 @@ tls=$(grep vmess: vmess.txt 2>/dev/null|awk -F "//" '{print $2}'|base64 -d 2>/de
  fi
 fi
    fi
-
 echo """
-proxies :
-- name: $nmv
-  server: $hostv
-  port: $portv
-  type: vmess
-  uuid: $uuid
-  sni: $bug
-  alterId: 0
-  cipher: auto
-  tls: true
-  skip-cert-verify: true
-  udp: true
-  network: ws
-  ws-path: $path
-  ws-headers: {Host: $bug}}""" > .config/clash/Sosmed.yaml
+port: 7890
+socks-port: 7891
+redir-port: 7892
+mixed-port: 7893
+mode: rule
+log-level: info
+allow-lan: true
+external-controller: 0.0.0.0:9090
+bind-address: '*'
+external-ui: yacd-gh-pages
+ipv6: false
+dns:
+  enable: true
+  ipv6: false
+  enhanced-mode: redir-host
+  listen: 0.0.0.0:7894
+  fallback-filter:
+    geoip: false
+    ipcidr:
+    - 240.0.0.0/4
+  nameserver:
+    - https://cloudflare-dns.com/dns-query
+    - https://dns.google/dns-query
+    - tls://1.1.1.1:853
+    - tls://8.8.8.8:853
+  fallback:
+    - tcp://1.1.1.1
+    - tcp://8.8.8.8
+    - 1.1.1.1
+    - 8.8.8.8
+tun:
+  enable: true
+  stack: system 
+  macOS-auto-route: true
+  macOS-auto-detect-interface: true
+  dns-hijack:
+    - tcp://8.8.8.8:53
+experimental:
+  interface-name: en0
+
+proxies:
+  - {name: $nmv, server: $hostv, port: $portv, type: vmess, uuid: $uuid, sni: $bug, alterId: 0, cipher: auto, tls: true, skip-cert-verify: true, udp: true, network: ws, ws-path: $path, ws-headers: {Host: $bug}}
+proxy-groups:
+  - name: vmess
+    type: select
+    proxies:
+      - $nmv
+
+rules:
+ - MATCH,vmess """ >$HOME/.config/clash/vm/config.yaml
 echo """
 Profile : $nmv
 Host    : $hostv
@@ -313,65 +398,37 @@ path    : $path
 sni     : $bug
 """> akun.txt
 display_result () {
- dialog --title "Info Account" \
+        dialog --title "Info Account" \
         --no-collapse \
         --msgbox "$result" 0 0
 }
 
 result=$(cat akun.txt)
 display_result
-
-mv config.yaml /sdcard/.config/clash/ 2>&1
+cp $HOME/.config/clash/vm/config.yaml $HOME/.config/clash/ 2>&1
+clash -t -d $HOME/.config/clash -f $HOME/.config/clash/config.yaml > $HOME/.config/clash/run.logs 2>&1
 sleep 2
-rm bug.txt 2>&1
-rm vmess.txt 2>&1
-rm akun.txt 2>&1
-bash openclash
-;;
-4)
-mkdir backupclash #2>&1
-cp $HOME/.config/clash/*.yaml $HOME/backupclash #2>&1
-cp -R backupclash /sdcard #$2>&1
-#a=$?
-#$if [ $a = 0 ]; then
-#cp -R /backupclash/*.yaml /sdcard/backupclash
-rm -r -f backupclash
-#fi
+if [ $? != 0 ]; then
 for i in $(seq 1 100)
 do
-   sleep 0.1 
+    sleep 0.1 
     echo $i
-done | whiptail --title 'Backup Config' --gauge 'Please wait...' 6 60 0
-#stat=$(Config Sukses Di Backup, Config Berada Di Directory Sdcard/backupclash)
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
 display_result () {
- dialog --title "Sukses Backup" \
+ dialog --title "Status Tunnels" \
         --no-collapse \
-        --msgbox "File berada di sdcard/backupclash" 0 0
+        --infobox "$status" 0 0
 }
-#stat=$(Config Sukses Di Backup,Config Berada Di Directory Sdcard/backupclash)
+status=$(cat $HOME/.config/clash/run.logs)
 display_result
-;;
-5)
-dialog --inputbox "Masukan Directory anda menyimpan Config..\nContoh :\nsdcard/Downloads/config.yaml:" 10 45 2>import
-imp=$(<import)
-cp -r -f /$imp $HOME/.config/clash/config.yaml 2>&1
-display_result () {
- dialog --title "Sukses Restore" \
-        --no-collapse \
-        --msgbox "Restore Sukses" 0 0
-}
-#stat=$(Config Sukses Di Backup,Config Berada Di Directory Sdcard/backupclash)
-display_result
-rm import 2>&1
-;;
-6)
- #       cp $HOME/.config/clash/a/config.yaml $HOME/.config/clash/ 2>&1
-        clash -t -d $HOME/.config/clash -f $HOME/.config/clash/config.yaml > $HOME/.config/clash/run.logs
-clear
-screen -dmS v2 clash &
+sleep 2
+menu
+else
+screen -dmS v2 clash
 for i in $(seq 1 100)
 do
-   sleep 0.1 
+    sleep 0.1 
     echo $i
 done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
 status=$(cat $HOME/.config/clash/run.logs)
@@ -383,12 +440,373 @@ display_result () {
 status=$(cat $HOME/.config/clash/run.logs)
 display_result
 xdg-open "http://127.0.0.1:9090/ui/#/proxies" & exit
+fi
+rm bug.txt 2>&1
+rm vmess.txt 2>&1
+rm akun.txt 2>&1
+
+}
+
+#empat
+function empat() {
+mkdir backupclash #2>&1
+cp $HOME/.config/clash/*.yaml $HOME/backupclash #2>&1
+cp -R backupclash /sdcard #$2>&1
+#a=$?https://raw.githubusercontent.com/R1punk/v7/main/openclash
+#$if [ $a = 0 ]; then
+#cp -R /backupclash/*.yaml /sdcard/backupclash
+rm -r -f backupclash
+#fi
+for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Backup Config' --gauge 'Please wait...' 6 60 0
+#stat=$(Config Sukses Di Backup, Config Berada Di Directory Sdcard/backupclash)
+display_result () {
+        dialog --title "Sukses Backup" \
+        --no-collapse \
+        --msgbox "File berada di sdcard/backupclash" 0 0
+}
+#stat=$(Config Sukses Di Backup,Config Berada Di Directory Sdcard/backupclash)
+display_result
+menu 
+}
+
+#Lima
+function lima() {
+dialog --inputbox "Masukan Directory anda menyimpan Config..\nContoh :\nsdcard/Downloads/config.yaml:" 10 45 2>import
+imp=$(<import)
+e=$(?)
+if [[ $e == '0' ]];
+then
+cp -r -f /$imp $HOME/.config/clash/config.yaml 2>&1
+display_result () {
+        dialog --title "Sukses Restore" \
+        --no-collapse \
+        --msgbox "Restore Sukses" 0 0
+}
+#stat=$(Config Sukses Di Backup,Config Berada Di Directory Sdcard/backupclash)
+display_result
+else
+menu
+fi
+rm import 2>&1
+}
+function enam(){
+dialog --inputbox "Pilih Config Yang Mau Di Edit\n1. Trojan\n2. Trojan Lb\n3. Vmes\n4. Yg Sedang DiGunakan\n0. Kembali Ke MENU" 20 30 2>p
+p=$(<p)
+case $p in
+1)
+micro $HOME/.config/clash/a/config.yaml
+sleep 2
+dialog --yesno "Start OpenClash...?" 10 25
+res=$? 
+if [[ $res == "0" ]];
+then
+cp $HOME/.config/clash/a/config.yaml $HOME/.config/clash/ 2>&1 
+       clash -t -d $HOME/.config/clash -f $HOME/.config/clash/config.yaml > $HOME/.config/clash/run.logs
+       if [ $? != 0 ]; then
+for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
+display_result () {
+ dialog --title "Status Tunnels" \
+        --no-collapse \
+        --infobox "$status" 0 0
+}
+status=$(cat $HOME/.config/clash/run.logs)
+display_result
+sleep 2
+menu
+else
+screen -dmS v2 clash
+for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
+display_result () {
+ dialog --title "Status Tunnels" \
+        --no-collapse \
+        --msgbox "$status" 0 0
+}
+status=$(cat $HOME/.config/clash/run.logs)
+display_result
+xdg-open "http://127.0.0.1:9090/ui/#/proxies" & exit
+fi
+fi
 ;;
-7)
-pidof clash >pid
+
+2)
+function start(){
+cp $HOME/.config/clash/lb/config.yaml $HOME/.config/clash/ 2>&1 
+       clash -t -d $HOME/.config/clash -f $HOME/.config/clash/config.yaml > $HOME/.config/clash/run.logs
+       screen -dmS v2 clash
+       for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
+display_result () {
+ dialog --title "Status Tunnels" \
+        --no-collapse \
+        --msgbox "$status" 0 0
+}
+status=$(cat $HOME/.config/clash/run.logs)
+display_result
+res=$(?)
+if [ $res = '0' ];
+then
+xdg-open "http://127.0.0.1:9090/ui/#/proxies" & exit
+else
+dialog --msgbox "config eror" 0 0
+menu
+fi
+}
+
+dialog --inputbox "Pilih yang mau di edit\n1. Games\n2. Youtube\n3. Browser\n4. Sosmed\n0. Kembali Ke MENU" 20 30 2>c
+co=$(<c)
+if [[ $co = '1' ]];
+then
+       micro $HOME/.config/clash/Game.yaml
+       dialog --yesno "Start OpenClash...?" 10 25
+       res=$?
+       if [ $res = '0' ]; then
+       start
+       fi
+       if [ $res = '1' ]; then
+       enam
+       fi
+elif [[ $co = '2' ]];
+then
+      micro $HOME/.config/clash/Youtube.yaml
+      dialog --yesno "Start OpenClash...?" 10 25
+       res=$?
+       if [ $res = '0' ]; then
+       start
+       fi
+       if [ $res = '1' ]; then
+       enam
+       fi
+elif [[ $co = '3' ]];
+then
+      micro $HOME/.config/clash/Browser.yaml
+      dialog --yesno "Start OpenClash...?" 10 25
+       res=$?
+       if [ $res = '0' ]; then
+       start
+       fi
+       if [ $res = '1' ]; then
+       enam
+       fi
+elif [[ $co = '4' ]];
+then
+      micro $HOME/.config/clash/Sosmed.yaml
+      dialog --yesno "Start OpenClash...?" 10 25
+       res=$?
+       if [ $res = '0' ]; then
+       start
+       fi
+       if [ $res = '1' ]; then
+       enam
+       fi
+elif [[ $co = '0' ]];
+then
+       menu
+else
+       status=$(Input Salah)
+       display_result () {
+#        dialog --title "Status Tunnels" \
+        --no-collapse \
+        --msgbox "$status" 0 0
+}
+#status=$(cat $HOME/.config/clash/run.logs)
+display_result
+       enam
+fi
+;;
+3)
+micro $HOME/.config/clash/vm/config.yaml
+sleep 2
+dialog --yesno "Start OpenClash...?" 10 25
+res=$? 
+if [[ $res == "0" ]];
+then
+cp $HOME/.config/clash/vm/config.yaml $HOME/.config/clash/ 2>&1 
+       clash -t -d $HOME/.config/clash -f $HOME/.config/clash/config.yaml > $HOME/.config/clash/run.logs
+       if [ $? != 0 ]; then
+for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
+display_result () {
+ dialog --title "Status Tunnels" \
+        --no-collapse \
+        --infobox "$status" 0 0
+}
+status=$(cat $HOME/.config/clash/run.logs)
+display_result
+sleep 2
+menu
+else
+screen -dmS v2 clash
+for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
+display_result () {
+ dialog --title "Status Tunnels" \
+        --no-collapse \
+        --msgbox "$status" 0 0
+}
+status=$(cat $HOME/.config/clash/run.logs)
+display_result
+xdg-open "http://127.0.0.1:9090/ui/#/proxies" & exit
+fi
+else
+menu
+fi
+;;
+4)
+micro $HOME/.config/clash/config.yaml
+dialog --yesno "Start OpenClash...?" 10 25
+res=$?
+if [ $res = '0' ]; then
+        clash -t -d $HOME/.config/clash -f $HOME/.config/clash/config.yaml > $HOME/.config/clash/run.logs
+       if [ $? != 0 ]; then
+for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
+display_result () {
+ dialog --title "Status Tunnels" \
+        --no-collapse \
+        --infobox "$status" 0 0
+}
+status=$(cat $HOME/.config/clash/run.logs)
+display_result
+sleep 2
+menu
+else
+screen -dmS v2 clash
+for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
+display_result () {
+ dialog --title "Status Tunnels" \
+        --no-collapse \
+        --msgbox "$status" 0 0
+}
+status=$(cat $HOME/.config/clash/run.logs)
+display_result
+xdg-open "http://127.0.0.1:9090/ui/#/proxies" & exit
+fi
+else
+menu
+fi
+;;
+0)
+menu
+;;
+esac
+rm p > /dev/null 2>&1
+}
+#Tujuh
+function tujuh(){
+#       
+       clash -t -d $HOME/.config/clash -f $HOME/.config/clash/config.yaml > $HOME/.config/clash/run.logs
+#cd $HOME
+if [ $? != 0 ]; then
+for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
+display_result () {
+ dialog --title "Status Tunnels" \
+        --no-collapse \
+        --infobox "$status" 0 0
+}
+status=$(cat $HOME/.config/clash/run.logs)
+display_result
+sleep 2
+menu
+else
+screen -dmS v2 clash
+for i in $(seq 1 100)
+do
+    sleep 0.1 
+    echo $i
+done | whiptail --title 'Start Clash' --gauge 'Connecting...' 6 60 0
+status=$(cat $HOME/.config/clash/run.logs)
+display_result () {
+ dialog --title "Status Tunnels" \
+        --no-collapse \
+        --msgbox "$status" 0 0
+}
+status=$(cat $HOME/.config/clash/run.logs)
+display_result
+xdg-open "http://127.0.0.1:9090/ui/#/proxies" & exit
+fi
+}
+#Delapan
+function delapan() {
+    pidof clash >pid
 PID=$(<pid)
 kill -9 $PID
 rm pid 2>&1
+}
+
+#MENU
+function menu() {
+    dialog --backtitle "                         Ripunk@E99" --title  \
+       "Open Clash" --inputbox \
+" \n_________________________________________\nMenu Tunnel :\n_________________________________________\n|1. Trojan                              |\n|2. LB                                  |\n|3. Vmess                               |\n_________________________________________\nMenu Config :\n_________________________________________\n|4. Backup Config                       |\n|5. Restore Config                      |\n|6. Edit config                         |\n_________________________________________\nStart Tunnels :\n_________________________________________\n|7. Start Clash                         |\n|8. Stop Clash                          |\n_________________________________________\n                               By :Ripunk " 30 45 2>pilih
+pil=$(<pilih)
+case $pil in
+1)
+satu
+;;
+2)
+dua
+;;
+3)
+tiga
+;;
+4)
+empat
+;;
+5)
+lima
+;;
+6)
+enam
+;;
+7)
+tujuh
+;;
+8)
+delapan
 ;;
 esac
-rm pilih 2>&1
+
+rm pilih > /dev/null 2>&1
+}
+
+menu
